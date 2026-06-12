@@ -120,10 +120,27 @@
   * {
     @apply border-border outline-ring/50;
     }
+  :root {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: geometricPrecision;
+    }
+  .dark {
+    color-scheme: dark;
+    }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior-x: none;
     }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+    }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    touch-action: manipulation;
     }
 }
