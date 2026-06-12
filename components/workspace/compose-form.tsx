@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ImagePlus, Loader2, Paintbrush, Wand2 } from "lucide-react"
+import { AlertCircle, ImagePlus, Loader2, Paintbrush, Wand2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Field, fieldInputClassName } from "./field"
@@ -17,6 +17,7 @@ export function ComposeForm() {
     setPrompt,
     fieldErrors,
     clearFieldError,
+    dismissError,
     promptRef,
     generateImage,
     isLoading,
@@ -74,9 +75,23 @@ export function ComposeForm() {
         {error ? (
           <div
             role="alert"
-            className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm leading-5 text-rose-700 dark:text-rose-200"
+            className="flex items-start gap-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-rose-700 dark:text-rose-200"
           >
-            {error}
+            <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={1.8} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold">{text.errorTitle}</p>
+              <p className="mt-0.5 max-h-24 overflow-y-auto break-words text-sm leading-5 [overflow-wrap:anywhere]">
+                {error}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissError}
+              aria-label={text.errorDismiss}
+              className="-mr-1 -mt-0.5 grid size-6 shrink-0 place-items-center rounded-md text-rose-700/70 transition-colors hover:bg-rose-500/15 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/30 dark:text-rose-200/70 dark:hover:text-rose-100"
+            >
+              <X className="size-3.5" strokeWidth={1.8} aria-hidden />
+            </button>
           </div>
         ) : null}
 

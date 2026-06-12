@@ -130,6 +130,10 @@ export function useImageWorkspace() {
     })
   }
 
+  function dismissError() {
+    setError("")
+  }
+
   function focusFirstError(errors: FieldErrors) {
     if (errors.baseUrl) {
       setSettingsOpen(true)
@@ -328,6 +332,7 @@ export function useImageWorkspace() {
     isEditMode,
     isConfigured,
     clearFieldError,
+    dismissError,
     generateImage,
     onReferenceChange,
     removeReferenceImage,
