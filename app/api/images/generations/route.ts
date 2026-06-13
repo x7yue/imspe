@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic"
-export const maxDuration = 300
 
 import {
   SUPPORTED_BACKGROUNDS,
