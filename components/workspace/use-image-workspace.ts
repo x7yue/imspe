@@ -22,6 +22,7 @@ import {
   usePrefersReducedMotion,
   validateForm,
 } from "./utils"
+import { requestEdit, requestGeneration } from "./upstream"
 
 export function useImageWorkspace() {
   const [locale, setLocale] = React.useState<Locale>("zh")
@@ -157,50 +158,32 @@ export function useImageWorkspace() {
     }
   }
 
-  async function readPayload(response: Response, fallback: string) {
-    try {
-      return (await response.json()) as GenerationResponse
-    } catch {
-      return { error: { message: fallback } }
-    }
-  }
-
   function submitGenerationRequest() {
-    return fetch("/api/images/generations", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        base_url: baseUrl,
-        api_key: apiKey,
-        model,
-        prompt,
-        n: count,
-        size,
-        quality,
-        output_format: format,
-        background: transparent ? "transparent" : "auto",
-      }),
+    return requestGeneration({
+      baseUrl,
+      apiKey,
+      model,
+      prompt,
+      n: count,
+      size,
+      quality,
+      outputFormat: format,
+      background: transparent ? "transparent" : "auto",
     })
   }
 
   function submitEditRequest(file: File) {
-    const body = new FormData()
-    body.set("base_url", baseUrl)
-    body.set("api_key", apiKey)
-    body.set("model", model)
-    body.set("prompt", prompt)
-    body.set("n", String(count))
-    body.set("size", size)
-    body.set("quality", quality)
-    body.set("output_format", format)
-    body.set("background", transparent ? "transparent" : "auto")
-    body.set("image", file, file.name || "reference-image")
-
-    return fetch("/api/images/edits", {
-      method: "POST",
-      body,
+    return requestEdit({
+      baseUrl,
+      apiKey,
+      model,
+      prompt,
+      n: count,
+      size,
+      quality,
+      outputFormat: format,
+      background: transparent ? "transparent" : "auto",
+      image: file,
     })
   }
 
@@ -220,13 +203,24 @@ export function useImageWorkspace() {
 
     try {
       const requestFailed = isEditMode ? text.editFailed : text.requestFailed
-      const response = referenceFile
-        ? await submitEditRequest(referenceFile)
-        : await submitGenerationRequest()
 
-      const payload = await readPayload(response, requestFailed)
+      let result: { ok: boolean; payload: GenerationResponse }
 
-      if (!response.ok) {
+      try {
+        result = referenceFile
+          ? await submitEditRequest(referenceFile)
+          : await submitGenerationRequest()
+      } catch {
+        throw new Error(
+          locale === "zh"
+            ? "无法连接到接口地址，请检查 URL、网络与跨域设置。"
+            : "Could not reach the base URL. Check the URL, network, and CORS settings."
+        )
+      }
+
+      const { ok, payload } = result
+
+      if (!ok) {
         throw new Error(readError(payload, requestFailed))
       }
 
