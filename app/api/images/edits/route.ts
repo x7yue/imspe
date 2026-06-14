@@ -13,6 +13,7 @@ import {
   pickInteger,
   readUpstreamPayload,
   sanitizeOpenAIError,
+  streamJsonWithKeepalive,
   validateConnection,
 } from "../_shared"
 
@@ -72,31 +73,30 @@ export async function POST(request: Request) {
   upstreamForm.set("output_format", outputFormat)
   upstreamForm.set("background", background)
 
-  try {
-    const upstream = await fetch(endpointFromBaseUrl(connection.baseUrl, "edits"), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${connection.apiKey}`,
-      },
-      body: upstreamForm,
-      cache: "no-store",
-    })
+  return streamJsonWithKeepalive(async () => {
+    try {
+      const upstream = await fetch(endpointFromBaseUrl(connection.baseUrl, "edits"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${connection.apiKey}`,
+        },
+        body: upstreamForm,
+        cache: "no-store",
+      })
 
-    const payload = await readUpstreamPayload(upstream)
+      const payload = await readUpstreamPayload(upstream)
 
-    if (!upstream.ok) {
-      return jsonError(sanitizeOpenAIError(payload, "Image edit failed."), upstream.status)
+      if (!upstream.ok) {
+        return { error: { message: sanitizeOpenAIError(payload, "Image edit failed.") } }
+      }
+
+      return payload
+    } catch {
+      return {
+        error: {
+          message: "Could not reach the configured base_url. Check the URL and network access.",
+        },
+      }
     }
-
-    return Response.json(payload, {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    })
-  } catch {
-    return jsonError(
-      "Could not reach the configured base_url. Check the URL and network access.",
-      502
-    )
-  }
+  })
 }

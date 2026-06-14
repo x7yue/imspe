@@ -150,3 +150,78 @@ export async function readUpstreamPayload(upstream: Response) {
     ? await upstream.json()
     : { error: { message: await upstream.text() } }
 }
+
+const KEEPALIVE_INTERVAL_MS = 15000
+
+// Image generation can take well over a minute. A plain proxied fetch keeps the
+// HTTP response header pending until the upstream finishes, which trips
+// Cloudflare's ~100s origin timeout (error 524) and any intermediate proxy
+// read timeout. To avoid that we flush the response head immediately and emit
+// whitespace heartbeats until the upstream resolves, then append the real JSON
+// body. JSON.parse ignores leading whitespace, so clients still call
+// response.json() unchanged. Errors are carried in the body as { error } since
+// the status line is already committed to 200 once streaming begins.
+export function streamJsonWithKeepalive(produce: () => Promise<unknown>) {
+  const encoder = new TextEncoder()
+  let timer: ReturnType<typeof setInterval> | null = null
+  let settled = false
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      // Flush headers + first byte right away so Cloudflare/nginx see a live
+      // response far ahead of their first-byte timeouts.
+      controller.enqueue(encoder.encode(" "))
+
+      timer = setInterval(() => {
+        if (settled) {
+          return
+        }
+
+        try {
+          controller.enqueue(encoder.encode(" "))
+        } catch {
+          // Stream already closed; nothing to keep alive.
+        }
+      }, KEEPALIVE_INTERVAL_MS)
+
+      let payload: unknown
+
+      try {
+        payload = await produce()
+      } catch {
+        payload = { error: { message: "Image request failed unexpectedly." } }
+      }
+
+      settled = true
+
+      if (timer) {
+        clearInterval(timer)
+      }
+
+      try {
+        controller.enqueue(encoder.encode(`\n${JSON.stringify(payload)}`))
+      } catch {
+        // Client disconnected before completion.
+      }
+
+      controller.close()
+    },
+    cancel() {
+      settled = true
+
+      if (timer) {
+        clearInterval(timer)
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      // Disable nginx response buffering so heartbeats pass through immediately.
+      "X-Accel-Buffering": "no",
+    },
+  })
+}

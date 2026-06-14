@@ -226,7 +226,10 @@ export function useImageWorkspace() {
 
       const payload = await readPayload(response, requestFailed)
 
-      if (!response.ok) {
+      // The image routes stream a keepalive body and always resolve 200 once
+      // streaming starts, so upstream failures arrive as { error } in the body
+      // rather than via a non-2xx status.
+      if (!response.ok || payload.error) {
         throw new Error(readError(payload, requestFailed))
       }
 

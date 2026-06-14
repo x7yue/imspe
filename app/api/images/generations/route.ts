@@ -13,6 +13,7 @@ import {
   pickInteger,
   readUpstreamPayload,
   sanitizeOpenAIError,
+  streamJsonWithKeepalive,
   validateConnection,
   asString,
 } from "../_shared"
@@ -79,35 +80,31 @@ export async function POST(request: Request) {
     moderation,
   }
 
-  try {
-    const upstream = await fetch(endpointFromBaseUrl(connection.baseUrl, "generations"), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${connection.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(upstreamPayload),
-      cache: "no-store",
-    })
+  return streamJsonWithKeepalive(async () => {
+    try {
+      const upstream = await fetch(endpointFromBaseUrl(connection.baseUrl, "generations"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${connection.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(upstreamPayload),
+        cache: "no-store",
+      })
 
-    const payload = await readUpstreamPayload(upstream)
+      const payload = await readUpstreamPayload(upstream)
 
-    if (!upstream.ok) {
-      return jsonError(
-        sanitizeOpenAIError(payload, "Image generation failed."),
-        upstream.status
-      )
+      if (!upstream.ok) {
+        return { error: { message: sanitizeOpenAIError(payload, "Image generation failed.") } }
+      }
+
+      return payload
+    } catch {
+      return {
+        error: {
+          message: "Could not reach the configured base_url. Check the URL and network access.",
+        },
+      }
     }
-
-    return Response.json(payload, {
-      headers: {
-        "Cache-Control": "no-store",
-      },
-    })
-  } catch {
-    return jsonError(
-      "Could not reach the configured base_url. Check the URL and network access.",
-      502
-    )
-  }
+  })
 }
